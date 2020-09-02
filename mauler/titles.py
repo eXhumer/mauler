@@ -165,21 +165,20 @@ def __load():
 
     timestamp = time()
 
-    if __titles_path.is_file():
-        with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
-            for _title in json.load(titles_stream):
-                title = Title(None)
-                title.path = Path(_title['path'])
-                title.title_id = _title['title_id']
-                title.version = _title['version']
+    with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
+        for _title in json.load(titles_stream):
+            title = Title(None)
+            title.path = Path(_title['path'])
+            title.title_id = _title['title_id']
+            title.version = _title['version']
 
-                if not title.path:
-                    continue
+            if not title.path:
+                continue
 
-                title_path = Path(title.path).resolve()
+            title_path = Path(title.path).resolve()
 
-                if title_path.is_file():
-                    __titles[title.path] = title
+            if title_path.is_file():
+                __titles[title.path] = title
 
     logging.info(f'loaded file list in {time() - timestamp} seconds')
 
@@ -188,6 +187,9 @@ def __save():
     __titles_path.parent.mkdir(exist_ok=True, parents=True)
 
     titles = []
+
+    with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
+        titles = titles + json.load(titles_stream)
 
     for _, title in __titles.items():
         titles.append(title.info)
