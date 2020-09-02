@@ -80,15 +80,6 @@ class Title:
         self.__version = val
 
     @property
-    def is_update(self):
-        return self.__title_id and self.__title_id.endswith('800')
-
-    @property
-    def is_dlc(self):
-        return self.__title_id and not self.is_update and \
-            not self.__title_id.endswith('000')
-
-    @property
     def info(self):
         return {
             'title_id': self.title_id,
@@ -106,7 +97,7 @@ def get_title(title_id):
 
 
 def get_base_id(title_id):
-    return '{:02X}'.format(int(title_id, 16) & 0xFFFFFFFFFFFFE000).zfill(16)
+    return '{:016X}'.format(int(title_id, 16) & 0xFFFFFFFFFFFFE000)
 
 
 def get_update_id(title_id):
