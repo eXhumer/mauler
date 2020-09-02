@@ -16,7 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from mauler.updates import get_outdated
+import sys
+from mauler.gui import AppWindow
+from PyQt5.QtWidgets import QApplication
+
 
 if __name__ == "__main__":
-    print(get_outdated())
+    app = QApplication(sys.argv)
+    window = AppWindow()
+    window.show()
+    sys.exit(app.exec())

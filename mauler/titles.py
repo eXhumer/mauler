@@ -38,7 +38,7 @@ class Title:
 
     @property
     def path(self):
-        return self.__path
+        return str(self.__path)
 
     @path.setter
     def path(self, val: Path):
@@ -87,13 +87,29 @@ class Title:
             'path': str(self.path)
         }
 
+    @property
+    def file_name(self):
+        return self.__path.name
+
 
 def get_all_title_ids():
     return [title.title_id for title in __titles.values()]
 
 
-def get_title(title_id):
-    return __titles[title_id]
+def get_title(path):
+    return __titles[path]
+
+
+def get_title_by_title_id(title_id):
+    for title in __titles.values():
+        if title.title_id == title_id:
+            return title
+
+    return None
+
+
+def is_title_available(title_id):
+    return title_id in __titles
 
 
 def get_base_id(title_id):
@@ -116,7 +132,7 @@ def is_dlc(title_id):
     return not is_base(title_id) and not is_update(title_id)
 
 
-def __scan(base):
+def scan(base):
     global __titles
 
     scan_count = 0
@@ -179,8 +195,9 @@ def __save():
 
     titles = []
 
-    with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
-        titles = titles + json.load(titles_stream)
+    if __titles_path.is_file():
+        with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
+            titles = titles + json.load(titles_stream)
 
     for _, title in __titles.items():
         titles.append(title.info)
@@ -190,7 +207,7 @@ def __save():
 
 
 for scan_str in config.paths.scan:
-    __scan(scan_str)
+    scan(scan_str)
 
 
 if __titles_path.is_file():

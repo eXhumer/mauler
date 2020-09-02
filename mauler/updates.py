@@ -20,53 +20,54 @@ import json
 from pathlib import Path
 from requests import request
 from mauler.utils import is_valid_cache
-from mauler.titles import get_all_title_ids, get_title, get_base_id, \
-    is_dlc, is_update
+from mauler.titles import get_all_title_ids, get_title_by_title_id, \
+    get_base_id, get_update_id, is_dlc, is_update, is_base, is_title_available
 
 __updates = {}
 __cache_versions_path = Path('cache/versions.json')
 
 
 def __get_latest_version(title_id: str):
-    check_id = title_id
-
+    # If title ID is update, get the base title ID instead (versions.json is
+    # mapped with title ID of base)
     if is_update(title_id):
-        check_id = get_base_id(title_id)
+        title_id = get_base_id(title_id)
 
+    # Else if title ID is base and there is an update title present, return 0
+    # immediately
+    elif is_base(title_id) and is_title_available(get_update_id(title_id)):
+        return 0
+
+    # Try getting the max version from title ID. if title ID not present,
+    # return 0
     try:
-        return max([int(version) for version in __updates[check_id].keys()])
+        return max([int(version) for version in __updates[title_id].keys()])
     except KeyError:
         return 0
 
 
-def get_outdated():
-    outdated = {}
+def get_title_version_info():
+    title_version_info = {}
 
     for title_id in get_all_title_ids():
         latest = __get_latest_version(title_id)
         available = 0
 
-        if is_update(title_id):
-            title_id = get_base_id(title_id)
+        if is_update(title_id) or is_dlc(title_id):
+            available = get_title_by_title_id(title_id).version
 
-            try:
-                available = get_title(title_id).version
-            except KeyError:
-                pass
-
-        elif is_dlc(title_id):
-            available = get_title(title_id).version
-
-        if title_id in outdated:
+        if title_id in title_version_info:
             continue
 
-        if latest > available:
-            outdated.update({title_id: {
-                'latest': latest,
-                'available': available,
-            }})
+        if latest < available:
+            latest = available
 
-    return outdated
+        title_version_info.update({title_id: {
+            'latest': latest,
+            'available': available,
+        }})
+
+    return title_version_info
 
 
 def __load():
