@@ -49,6 +49,21 @@ def __load():
             paths.title_exts = [paths.title_exts]
 
 
+def save():
+    __conf_path.parent.mkdir(exist_ok=True, parents=True)
+
+    out_conf = {}
+
+    if __conf_path.is_file():
+        with __conf_path.open(mode='r', encoding='utf8') as conf_stream:
+            out_conf.update(json.load(conf_stream))
+
+    out_conf.update({'paths': paths.__dict__})
+
+    with __conf_path.open(mode='w', encoding='utf8') as conf_stream:
+        json.dump(out_conf, conf_stream)
+
+
 paths = Paths()
 __conf_path = Path('conf/mauler.conf')
 
