@@ -17,57 +17,58 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import json
+import logging
 from pathlib import Path
 from requests import request
 from mauler.utils import is_valid_cache
-from mauler.titles import get_all_title_ids, get_title_by_title_id, \
-    get_base_id, get_update_id, is_dlc, is_update, is_base, is_title_available
+from mauler.titles import get_all_title_ids, get_title, is_title_available
 
 __updates = {}
 __cache_versions_path = Path('cache/versions.json')
 
 
-def __get_latest_version(title_id: str):
-    # If title ID is update, get the base title ID instead (versions.json is
-    # mapped with title ID of base)
-    if is_update(title_id):
-        title_id = get_base_id(title_id)
-
-    # Else if title ID is base and there is an update title present, return 0
-    # immediately
-    elif is_base(title_id) and is_title_available(get_update_id(title_id)):
-        return 0
-
-    # Try getting the max version from title ID. if title ID not present,
-    # return 0
-    try:
-        return max([int(version) for version in __updates[title_id].keys()])
-    except KeyError:
-        return 0
+def get_latest_version(versions) -> int:
+    return max([int(version) for version in versions])
 
 
-def get_title_version_info():
-    title_version_info = {}
+def get_title_version_info(title_id: str):
+    title = get_title(title_id)
+
+    if title is None:
+        return None
+
+    res = {
+        'available': title.version,
+        'latest': title.version
+    }
+
+    dlc_with_update = title.is_dlc and title_id.lower() in __updates
+    base_with_update = title.is_base and not \
+        is_title_available(title.update_title_id) and title_id.lower() in \
+        __updates
+    update_with_update = title.is_update and title.base_title_id.lower() in \
+        __updates
+
+    if base_with_update or dlc_with_update or update_with_update:
+        if base_with_update or dlc_with_update:
+            versions = __updates[title_id.lower()].keys()
+
+        elif update_with_update:
+            versions = __updates[title.base_title_id.lower()].keys()
+
+        res['latest'] = get_latest_version(versions)
+
+    return res
+
+
+def get_all_title_version_info():
+    all_title_version_info = {}
 
     for title_id in get_all_title_ids():
-        latest = __get_latest_version(title_id)
-        available = 0
+        title_version_info = get_title_version_info(title_id)
+        all_title_version_info.update({title_id: title_version_info})
 
-        if is_update(title_id) or is_dlc(title_id):
-            available = get_title_by_title_id(title_id).version
-
-        if title_id in title_version_info:
-            continue
-
-        if latest < available:
-            latest = available
-
-        title_version_info.update({title_id: {
-            'latest': latest,
-            'available': available,
-        }})
-
-    return title_version_info
+    return all_title_version_info
 
 
 def __load():
@@ -82,6 +83,8 @@ def __load():
         if res.status_code == 200:
             __updates.update(res.json())
             __save_cache()
+        else:
+            logging.warning('Failed to get latest versions.json!')
 
 
 def __load_cache():
