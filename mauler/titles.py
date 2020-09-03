@@ -134,8 +134,9 @@ def is_title_available(title_id) -> bool:
 def scan(base: str):
     global __titles
 
-    scan_count = 0
     scanned_title_list = {}
+
+    __remove_deleted_files()
 
     for root, dirs, file_names in os.walk(base, topdown=False,
                                           followlinks=True):
@@ -161,11 +162,11 @@ def scan(base: str):
                 continue
 
             if title_already_scanned and \
-                    scanned_title_list[title.title_id] > title.version:
+                    scanned_title_list[title.title_id].version > title.version:
                 continue
 
             if title_already_scanned and scanned_title_mtime <= \
-                    scanned_title_list[title.title_id].stat().st_mtime:
+                    scanned_title_list[title.title_id].path.stat().st_mtime:
                 continue
 
             scanned_title_list[title.title_id] = title
@@ -175,8 +176,6 @@ def scan(base: str):
             __titles[title_id] = title
 
     __save()
-    print(__titles)
-    return scan_count
 
 
 def __load():
@@ -194,21 +193,33 @@ def __load():
             if title.path.is_file():
                 __titles[title.title_id] = title
 
+    __save()
+
 
 def __save():
     __titles_path.parent.mkdir(exist_ok=True, parents=True)
 
     titles = {}
 
-    if __titles_path.is_file():
-        with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
-            titles = json.load(titles_stream)
-
     for title_id, title in __titles.items():
         titles.update({title_id: title.path_str})
 
     with __titles_path.open(mode='w', encoding='utf8') as titles_stream:
         json.dump(titles, titles_stream, indent=4, sort_keys=True)
+
+
+def __remove_deleted_files():
+    global __titles
+
+    refreshed_titles = {}
+
+    for title_id, title in __titles.items():
+        if __titles[title_id].path.is_file():
+            refreshed_titles.update({title_id: title})
+
+    __titles.clear()
+    __titles.update(refreshed_titles)
+    __save()
 
 
 if __titles_path.is_file():

@@ -33,10 +33,8 @@ class AppWindow(QWidget):
                 config.paths.scan.append(str(scan_path))
                 config.save()
 
-            scan_res = titles.scan(str(scan_path))
-
-            if scan_res > 0:
-                self.layout.table.refresh_table()
+            titles.scan(str(scan_path))
+            self.layout.table.refresh_table()
 
         else:
             QMessageBox.information(self, 'Error processing scan path',
