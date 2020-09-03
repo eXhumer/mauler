@@ -1,7 +1,7 @@
 from pathlib import Path
 from mauler import config
 from mauler import titles
-from mauler.updates import get_title_version_info
+from mauler.updates import get_all_title_version_info
 from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, \
     QVBoxLayout, QDesktopWidget, QHBoxLayout, QLineEdit, QPushButton, \
     QHeaderView, QMessageBox
@@ -29,9 +29,15 @@ class AppWindow(QWidget):
         scan_path = Path(self.layout.header.textbox.text()).resolve()
 
         if scan_path.is_dir():
+            if str(scan_path) not in config.paths.scan:
+                config.paths.scan.append(str(scan_path))
+                config.save()
+
             scan_res = titles.scan(str(scan_path))
+
             if scan_res > 0:
                 self.layout.table.refresh_table()
+
         else:
             QMessageBox.information(self, 'Error processing scan path',
                                     'The path specified to scan is not a ' +
@@ -91,7 +97,7 @@ class AppWindowTable(QTableWidget):
     def refresh_table(self):
         self.setRowCount(0)
 
-        title_version_info = get_title_version_info()
+        title_version_info = get_all_title_version_info()
         self.setRowCount(len(title_version_info))
 
         rowIdx = 0
