@@ -19,13 +19,13 @@
 import re
 import os
 import json
-import logging
-from time import time
 from pathlib import Path
 from mauler import config
 
 __titles = {}
 __titles_path = Path('conf/titles.json')
+TITLE_ID_PATTERN = r'.*\[(?P<title_id>[a-fA-F0-9]{16})\].*'
+VERSION_PATTERN = r'.*\[v(?P<version>[0-9]+)\].*'
 
 
 class Title:
@@ -37,39 +37,39 @@ class Title:
         self.path = path
 
     @property
+    def path_str(self):
+        return str(self.__path) if self.__path else None
+
+    @property
     def path(self):
-        return str(self.__path)
+        return self.__path
 
     @path.setter
-    def path(self, val: Path):
-        self.__path = val
+    def path(self, new_path: Path):
+        self.__path = new_path
 
-        if val and val.is_file():
-            check_title_id = re.match(r'.*\[(?P<title_id>[a-fA-F0-9]{16})\].*',
-                                      str(val), re.I)
+        if self.__path is not None:
+            title_id_check = re.match(TITLE_ID_PATTERN, self.__path.name,
+                                      re.I)
 
-            if check_title_id:
-                self.title_id = check_title_id.group('title_id')
-
-            check_version = re.match(r'.*\[v(?P<version>[0-9]+)\].*', str(val),
-                                     re.I)
-
-            if check_version:
-                self.version = int(check_version.group('version'))
+            if title_id_check:
+                self.title_id = title_id_check.group('title_id')
             else:
-                self.version = 0
+                self.__path = None
+                return
+
+            version_check = re.match(VERSION_PATTERN, new_path.name, re.I)
+
+            self.version = int(version_check.group('version')) if \
+                version_check else 0
 
     @property
     def title_id(self):
-        return self.__title_id or ('0' * 16)
+        return self.__title_id
 
     @title_id.setter
-    def title_id(self, val: str):
-        if not re.match(r'[A-F0-9]{16}', val, re.I):
-            logging.warning('Title ID specified is not a valid title ID. ' +
-                            'Valid Title ID must be a 16 characters ' +
-                            'hexadecimal string!')
-        self.__title_id = val
+    def title_id(self, new_title_id: str):
+        self.__title_id = new_title_id.upper()
 
     @property
     def version(self):
@@ -82,63 +82,60 @@ class Title:
     @property
     def info(self):
         return {
-            'title_id': self.title_id,
-            'version': self.version,
-            'path': str(self.path)
+            self.title_id: self.path_str
         }
 
     @property
     def file_name(self):
         return self.__path.name
 
+    @property
+    def file_modified(self):
+        return self.__path.stat().st_mtime
+
+    @property
+    def base_title_id(self):
+        return '{:016X}'.format(int(self.__title_id, 16) & 0xFFFFFFFFFFFFE000)
+
+    @property
+    def update_title_id(self):
+        return self.base_title_id[:13] + '800'
+
+    @property
+    def is_base(self):
+        return self.__title_id == self.base_title_id
+
+    @property
+    def is_update(self):
+        return self.__title_id == self.update_title_id
+
+    @property
+    def is_dlc(self):
+        return not self.is_base and not self.is_update
+
+
+def is_valid_title_path(path_to_check: Path):
+    return path_to_check.suffix in config.paths.title_exts and \
+        re.match(TITLE_ID_PATTERN, path_to_check.name, re.I)
+
 
 def get_all_title_ids():
-    return [title.title_id for title in __titles.values()]
+    return __titles.keys()
 
 
-def get_title(path):
-    return __titles[path]
+def get_title(title_id: str) -> Title:
+    return __titles.get(title_id, None)
 
 
-def get_title_by_title_id(title_id):
-    for title in __titles.values():
-        if title.title_id == title_id:
-            return title
-
-    return None
-
-
-def is_title_available(title_id):
+def is_title_available(title_id) -> bool:
     return title_id in __titles
 
 
-def get_base_id(title_id):
-    return '{:016X}'.format(int(title_id, 16) & 0xFFFFFFFFFFFFE000)
-
-
-def get_update_id(title_id):
-    return get_base_id(title_id)[:13] + '800'
-
-
-def is_base(title_id):
-    return get_base_id(title_id).lower() == title_id.lower()
-
-
-def is_update(title_id):
-    return get_update_id(title_id) == title_id
-
-
-def is_dlc(title_id):
-    return not is_base(title_id) and not is_update(title_id)
-
-
-def scan(base):
+def scan(base: str):
     global __titles
 
     scan_count = 0
-    title_list = {}
-
-    logging.info(f'scanning files in {base}')
+    scanned_title_list = {}
 
     for root, dirs, file_names in os.walk(base, topdown=False,
                                           followlinks=True):
@@ -146,69 +143,77 @@ def scan(base):
         for file_name in file_names:
             file_path = root_path.joinpath(file_name).resolve()
 
-            if file_path.suffix in config.paths.title_exts:
-                title_list[str(file_path)] = file_name
+            title = Title(file_path)
 
-    if len(title_list) == 0:
-        __save()
-        return 0
+            if not title.path:
+                continue
 
-    for path, file_name in title_list.items():
-        if path not in __titles:
-            _path = Path(path)
-            logging.info(f'adding {file_name}')
-            __titles[path] = Title(_path)
+            title_already_present = title.title_id in __titles
+            title_already_scanned = title.title_id in scanned_title_list
+            scanned_title_mtime = title.path.stat().st_mtime
 
-            scan_count = scan_count + 1
-            if scan_count % 20 == 0:
-                __save()
+            if title_already_present and __titles[title.title_id].version \
+                    > title.version:
+                continue
+
+            if title_already_present and scanned_title_mtime <= \
+                    __titles[title.title_id].path.stat().st_mtime:
+                continue
+
+            if title_already_scanned and \
+                    scanned_title_list[title.title_id] > title.version:
+                continue
+
+            if title_already_scanned and scanned_title_mtime <= \
+                    scanned_title_list[title.title_id].stat().st_mtime:
+                continue
+
+            scanned_title_list[title.title_id] = title
+
+    if len(scanned_title_list) > 0:
+        for title_id, title in scanned_title_list.items():
+            __titles[title_id] = title
 
     __save()
+    print(__titles)
     return scan_count
 
 
 def __load():
     global __titles
 
-    timestamp = time()
+    __titles.clear()
 
     with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
-        for _title in json.load(titles_stream):
-            title = Title(None)
-            title.path = Path(_title['path'])
-            title.title_id = _title['title_id']
-            title.version = _title['version']
+        for title_id, title_path in json.load(titles_stream).items():
+            title = Title(Path(title_path))
 
             if not title.path:
                 continue
 
-            title_path = Path(title.path).resolve()
-
-            if title_path.is_file():
-                __titles[title.path] = title
-
-    logging.info(f'loaded file list in {time() - timestamp} seconds')
+            if title.path.is_file():
+                __titles[title.title_id] = title
 
 
 def __save():
     __titles_path.parent.mkdir(exist_ok=True, parents=True)
 
-    titles = []
+    titles = {}
 
     if __titles_path.is_file():
         with __titles_path.open(mode='r', encoding='utf8') as titles_stream:
-            titles = titles + json.load(titles_stream)
+            titles = json.load(titles_stream)
 
-    for _, title in __titles.items():
-        titles.append(title.info)
+    for title_id, title in __titles.items():
+        titles.update({title_id: title.path_str})
 
     with __titles_path.open(mode='w', encoding='utf8') as titles_stream:
         json.dump(titles, titles_stream, indent=4, sort_keys=True)
 
 
-for scan_str in config.paths.scan:
-    scan(scan_str)
-
-
 if __titles_path.is_file():
     __load()
+
+
+for scan_str in config.paths.scan:
+    scan(scan_str)
