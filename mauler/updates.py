@@ -17,7 +17,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import json
-import logging
 from pathlib import Path
 from requests import request
 from mauler.utils import is_valid_cache
@@ -83,8 +82,6 @@ def __load():
         if res.status_code == 200:
             __updates.update(res.json())
             __save_cache()
-        else:
-            logging.warning('Failed to get latest versions.json!')
 
 
 def __load_cache():
