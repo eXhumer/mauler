@@ -134,14 +134,14 @@ def is_title_available(title_id) -> bool:
     return title_id in __titles
 
 
-def scan(base: str):
+def scan(base: Path):
     global __titles
 
     scanned_title_list = {}
 
     __remove_deleted_files()
 
-    for root, dirs, file_names in os.walk(base, topdown=False,
+    for root, dirs, file_names in os.walk(str(base.resolve()), topdown=False,
                                           followlinks=True):
         root_path = Path(root)
         for file_name in file_names:
@@ -229,5 +229,5 @@ if __titles_path.is_file():
     __load()
 
 
-for scan_str in config.paths.scan:
-    scan(scan_str)
+for scan_path in config.paths.scan:
+    scan(scan_path)

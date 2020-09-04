@@ -47,11 +47,11 @@ class AppWindow(QWidget):
         scan_path = Path(self.layout.header.textbox.text()).resolve()
 
         if scan_path.is_dir():
-            if str(scan_path) not in config.paths.scan:
-                config.paths.scan.append(str(scan_path))
+            if scan_path not in config.paths.scan:
+                config.paths.scan.append(scan_path)
                 config.save()
 
-            titles.scan(str(scan_path))
+            titles.scan(scan_path)
             self.layout.table.refresh_table()
 
         else:

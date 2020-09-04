@@ -22,8 +22,15 @@ from pathlib import Path
 
 class Paths:
     def __init__(self):
-        self.scan = ['.']
+        self.scan = [Path('.').resolve()]
         self.title_exts = ['.nsp', '.nsz', '.xci', '.xcz']
+
+    @property
+    def dict_to_save(self):
+        return {
+            'scan': [str(path) for path in self.scan],
+            'title_exts': self.title_exts
+        }
 
 
 def __load():
@@ -33,32 +40,37 @@ def __load():
         conf = json.load(conf_stream)
 
         try:
-            paths.scan = conf['paths']['scan']
+            paths_scan = conf['paths']['scan']
+
+            if not isinstance(paths_scan, list):
+                paths_scan = [paths_scan]
+
+            paths.scan.clear()
+
+            for scan_str in paths_scan:
+                scan_path = Path(scan_str).resolve()
+
+                if scan_path.is_dir():
+                    paths.scan.append(scan_path)
+
         except KeyError:
             pass
-
-        if not isinstance(paths.scan, list):
-            paths.scan = [paths.scan]
 
         try:
             paths.title_exts = conf['paths']['title_exts']
+
+            if not isinstance(paths.title_exts, list):
+                paths.title_exts = [paths.title_exts]
+
         except KeyError:
             pass
-
-        if not isinstance(paths.title_exts, list):
-            paths.title_exts = [paths.title_exts]
 
 
 def save():
     __conf_path.parent.mkdir(exist_ok=True, parents=True)
 
     out_conf = {}
-
-    if __conf_path.is_file():
-        with __conf_path.open(mode='r', encoding='utf8') as conf_stream:
-            out_conf.update(json.load(conf_stream))
-
-    out_conf.update({'paths': paths.__dict__})
+    out_conf.update({'paths': paths.dict_to_save})
 
     with __conf_path.open(mode='w', encoding='utf8') as conf_stream:
         json.dump(out_conf, conf_stream)
