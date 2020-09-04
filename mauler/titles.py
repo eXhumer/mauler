@@ -33,7 +33,7 @@ class Title:
     __title_id = None
     __version = None
 
-    def __init__(self, path: Path = None):
+    def __init__(self, path: Path):
         self.path = path
 
     @property
@@ -49,19 +49,22 @@ class Title:
         self.__path = new_path
 
         if self.__path is not None:
-            title_id_check = re.match(TITLE_ID_PATTERN, self.__path.name,
-                                      re.I)
+            if self.__path.is_file():
+                title_id_check = re.match(TITLE_ID_PATTERN, self.__path.name,
+                                          re.I)
 
-            if title_id_check:
-                self.title_id = title_id_check.group('title_id')
+                if title_id_check:
+                    self.title_id = title_id_check.group('title_id')
+
+                    version_check = re.match(VERSION_PATTERN, new_path.name,
+                                             re.I)
+
+                    self.version = int(version_check.group('version')) if \
+                        version_check else 0
+                else:
+                    self.__path = None
             else:
                 self.__path = None
-                return
-
-            version_check = re.match(VERSION_PATTERN, new_path.name, re.I)
-
-            self.version = int(version_check.group('version')) if \
-                version_check else 0
 
     @property
     def title_id(self):
@@ -151,14 +154,14 @@ def scan(base: str):
 
             title_already_present = title.title_id in __titles
             title_already_scanned = title.title_id in scanned_title_list
-            scanned_title_mtime = title.path.stat().st_mtime
+            scanned_title_mtime = title.file_modified
 
             if title_already_present and __titles[title.title_id].version \
                     > title.version:
                 continue
 
             if title_already_present and scanned_title_mtime <= \
-                    __titles[title.title_id].path.stat().st_mtime:
+                    __titles[title.title_id].file_modified:
                 continue
 
             if title_already_scanned and \
@@ -166,7 +169,7 @@ def scan(base: str):
                 continue
 
             if title_already_scanned and scanned_title_mtime <= \
-                    scanned_title_list[title.title_id].path.stat().st_mtime:
+                    scanned_title_list[title.title_id].file_modified:
                 continue
 
             scanned_title_list[title.title_id] = title
