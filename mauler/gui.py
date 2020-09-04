@@ -23,7 +23,7 @@ from mauler.updates import get_all_title_version_info
 from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, \
     QVBoxLayout, QDesktopWidget, QHBoxLayout, QLineEdit, QPushButton, \
     QHeaderView, QMessageBox, QAbstractItemView
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtCore import pyqtSlot, Qt, QRunnable, QObject, pyqtSignal, \
     QThreadPool
 
@@ -150,6 +150,11 @@ class AppWindowTable(QTableWidget):
             self.setItem(rowIdx, 0, QTableWidgetItem(title_id))
             self.setItem(rowIdx, 1, QTableWidgetItem(str(available)))
             self.setItem(rowIdx, 2, QTableWidgetItem(str(latest)))
+            if latest > available:
+                red_color = QColor('red')
+                self.item(rowIdx, 0).setBackground(red_color)
+                self.item(rowIdx, 1).setBackground(red_color)
+                self.item(rowIdx, 2).setBackground(red_color)
             rowIdx += 1
 
         self.setRowCount(rowIdx)
