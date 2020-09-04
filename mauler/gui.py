@@ -4,7 +4,7 @@ from mauler import titles
 from mauler.updates import get_all_title_version_info
 from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, \
     QVBoxLayout, QDesktopWidget, QHBoxLayout, QLineEdit, QPushButton, \
-    QHeaderView, QMessageBox
+    QHeaderView, QMessageBox, QAbstractItemView
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot, Qt
 
@@ -72,6 +72,7 @@ class AppWindowTable(QTableWidget):
     def __init__(self, parent: QWidget):
         super().__init__(parent)
         self.setColumnCount(3)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         headers = [
             QTableWidgetItem('Title ID'),
