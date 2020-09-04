@@ -10,3 +10,7 @@ conf/
 *.nsz
 *.xci
 *.xcz
+
+build/
+dist/
+*.spec
