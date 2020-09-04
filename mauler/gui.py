@@ -24,12 +24,50 @@ from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, \
     QVBoxLayout, QDesktopWidget, QHBoxLayout, QLineEdit, QPushButton, \
     QHeaderView, QMessageBox, QAbstractItemView
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSlot, Qt, QRunnable, QObject, pyqtSignal, \
+    QThreadPool
+
+
+class ScanWorkerSignals(QObject):
+    finished = pyqtSignal()
+
+
+class ScanWorker(QRunnable):
+    def __init__(self, scan_path: Path):
+        super().__init__()
+        self.scan_path = scan_path
+        self.signals = ScanWorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        if self.scan_path.is_dir():
+            already_exists = False
+
+            for exist_scan_path in config.paths.scan:
+                if self.scan_path == exist_scan_path:
+                    already_exists = True
+                    break
+
+            if not already_exists:
+                config.paths.scan.append(self.scan_path)
+                config.save()
+
+            try:
+                titles.scan(self.scan_path)
+            finally:
+                self.signals.finished.emit()
+
+        else:
+            QMessageBox.information(self, 'Error processing scan path',
+                                    'The path specified to scan is not a ' +
+                                    'valid directory!')
 
 
 class AppWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.threadpool = QThreadPool()
+
         self.setWindowIcon(QIcon('images/icon.jpg'))
         self.setWindowTitle('Mauler')
 
@@ -42,22 +80,11 @@ class AppWindow(QWidget):
 
         self.layout = AppWindowLayout(self)
 
-    @pyqtSlot()
     def on_scan(self):
         scan_path = Path(self.layout.header.textbox.text()).resolve()
-
-        if scan_path.is_dir():
-            if scan_path not in config.paths.scan:
-                config.paths.scan.append(scan_path)
-                config.save()
-
-            titles.scan(scan_path)
-            self.layout.table.refresh_table()
-
-        else:
-            QMessageBox.information(self, 'Error processing scan path',
-                                    'The path specified to scan is not a ' +
-                                    'valid directory!')
+        scan_worker = ScanWorker(scan_path)
+        scan_worker.signals.finished.connect(self.layout.table.refresh_table)
+        self.threadpool.start(scan_worker)
 
 
 class AppWindowHeader(QHBoxLayout):
@@ -110,7 +137,6 @@ class AppWindowTable(QTableWidget):
         self.setSortingEnabled(True)
         self.refresh_table()
 
-    @pyqtSlot()
     def refresh_table(self):
         self.setRowCount(0)
 
